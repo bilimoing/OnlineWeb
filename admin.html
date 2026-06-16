@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="末泠个人网站后台。" />
+  <title>末泠 · 后台</title>
+  <link rel="icon" type="image/png" href="assets/web-icon.png" />
+  <link rel="stylesheet" href="styles.css?v=20260616-font" />
+</head>
+<body data-page="admin">
+  <div id="page-loader" class="page-loader"><div class="loader-box"><span class="pixel-label">ADMIN PANEL</span><strong>GitHub Sync</strong><div class="loader-bar"><span></span></div><small>正在进入后台...</small></div></div>
+  <canvas id="world-canvas" aria-hidden="true"></canvas><div class="scanline" aria-hidden="true"></div><div class="pixel-vignette" aria-hidden="true"></div>
+
+  <header class="topbar" data-reveal>
+    <div class="topbar-inner">
+      <a class="brand" href="index.html" aria-label="返回首页">末泠的个人网页</a>
+      <div class="topbar-actions">
+        <a id="login-button" class="pixel-button top-login" href="admin.html">登录</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="page shell">
+    <section class="page-title" data-reveal>
+      <p class="pixel-label">Dashboard</p>
+      <h1>后台管理</h1>
+      <p>使用管理员密码进入后台，GitHub Personal Token 用于同步仓库文件。Mod 维持旧站风格的标签与描述，工具保持极简展示。</p>
+    </section>
+
+    <section class="panel login-panel" data-reveal>
+      <h2>登录</h2>
+      <form id="login-form" class="admin-form">
+        <label class="field"><span>GitHub Token</span><input name="token" required placeholder="ghp_... / github_pat_..." /></label>
+        <label class="field"><span>管理员密码</span><input name="password" type="password" required placeholder="输入管理员密码" /></label>
+        <button class="pixel-button primary" type="submit">进入后台</button>
+      </form>
+      <p id="login-hint">登录后可上传 Mod / 工具，并同步到 GitHub 仓库。</p>
+    </section>
+
+    <section class="dashboard-grid">
+      <article class="panel" data-reveal><span class="pixel-label">登录状态</span><h2 id="auth-state">未登录</h2><p id="auth-desc">登录后可以管理后台。</p></article>
+      <article class="panel" data-reveal><span class="pixel-label">总下载</span><h2 id="download-total">0</h2><p>来自 Mod 与工具下载按钮的真实接口统计。</p></article>
+      <article class="panel" data-reveal><span class="pixel-label">上传记录</span><h2 id="sync-total">0</h2><p>已提交到 GitHub 数据文件的上传记录。</p></article>
+    </section>
+
+    <section class="panel admin-panel" data-reveal>
+      <h2>上传内容</h2>
+      <div class="admin-tabs" role="tablist" aria-label="上传类型">
+        <button class="tag-button active" type="button" data-upload-type="mod">上传 Mod</button>
+        <button class="tag-button" type="button" data-upload-type="tool">上传工具</button>
+      </div>
+      <form id="upload-form" class="admin-form">
+        <input type="hidden" name="type" value="mod" />
+        <label class="field"><span>名称</span><input name="name" required placeholder="例如 自定义卖物品" /></label>
+        <label class="field"><span>分类</span><input name="category" required placeholder="Mod 默认泰拉瑞亚 / 工具输入分类" value="泰拉瑞亚" /></label>
+        <label class="field"><span>版本</span><input name="version" required placeholder="例如 0.1.0" /></label>
+        <label class="field"><span>图标路径</span><input name="icon" placeholder="mods/example_ic.png" /></label>
+        <label class="field"><span>文件路径</span><input name="file" required placeholder="mods/example.tmod 或 tools/example.zip" /></label>
+        <label class="field"><span>源码路径</span><input name="source" placeholder="mods/example_src.zip" /></label>
+        <label class="field"><span>校验值</span><input name="checksum" placeholder="SHA256 或手动校验值" /></label>
+        <label class="field"><span>图标文件</span><input name="iconFile" type="file" accept="image/*" /></label>
+        <label class="field"><span>主文件</span><input name="mainFile" type="file" /></label>
+        <label class="field"><span>源码文件</span><input name="sourceFile" type="file" /></label>
+        <label class="field"><span>预览截图文件</span><input name="screenshotFiles" type="file" accept="image/*,video/*" multiple /></label>
+        <label class="field full mod-only"><span>预设标签</span><div id="preset-tags" class="tag-selector"></div></label>
+        <label class="field full mod-only"><span>自定义标签</span><div class="manual-tag-input"><input id="manual-tag" type="text" placeholder="输入标签后添加" /><button id="add-tag-btn" type="button">添加</button></div></label>
+        <label class="field full mod-only"><span>已选标签</span><div id="selected-tags" class="selected-tags"></div></label>
+        <label class="field full"><span>描述</span><textarea name="desc" required placeholder="输入描述"></textarea></label>
+        <label class="field full"><span>更新日志</span><textarea name="changelog" placeholder="一行一条更新日志"></textarea></label>
+        <button class="pixel-button primary" type="submit">上传并同步 GitHub</button>
+      </form>
+    </section>
+
+    <section class="panel" data-reveal>
+      <h2>GitHub 上传记录</h2>
+      <div id="sync-list" class="record-list"></div>
+    </section>
+  </main>
+
+  <footer class="footer shell"><span>© <span id="year"></span> 末泠</span><nav class="social-links" aria-label="联系方式"><a href="https://github.com/bilimoing/OnlineWeb" target="_blank" rel="noreferrer" aria-label="GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.5v-1.9c-2.78.62-3.37-1.22-3.37-1.22-.45-1.2-1.11-1.52-1.11-1.52-.91-.64.07-.63.07-.63 1 .08 1.53 1.06 1.53 1.06.9 1.57 2.35 1.12 2.92.86.09-.66.35-1.12.63-1.37-2.22-.26-4.55-1.14-4.55-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.3 9.3 0 0 1 12 6.95c.85 0 1.7.12 2.5.34 1.9-1.33 2.74-1.05 2.74-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.8-4.57 5.05.36.32.68.94.68 1.9v2.83c0 .28.18.6.69.5A10.2 10.2 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z"/></svg></a><a href="https://space.bilibili.com/1196822829?spm_id_from=333.33.0.0" target="_blank" rel="noreferrer" aria-label="Bilibili"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 3.1 10.7 6h2.6l2.5-2.9 1.4 1.2L15.8 6H18c2.2 0 4 1.8 4 4v6.2c0 2.2-1.8 4-4 4H6c-2.2 0-4-1.8-4-4V10c0-2.2 1.8-4 4-4h2.2L6.8 4.3l1.4-1.2ZM6 8.3c-.9 0-1.7.8-1.7 1.7v6.2c0 .9.8 1.7 1.7 1.7h12c.9 0 1.7-.8 1.7-1.7V10c0-.9-.8-1.7-1.7-1.7H6Zm2.7 3.2c.7 0 1.2.6 1.2 1.4 0 .8-.5 1.4-1.2 1.4s-1.2-.6-1.2-1.4c0-.8.5-1.4 1.2-1.4Zm6.6 0c.7 0 1.2.6 1.2 1.4 0 .8-.5 1.4-1.2 1.4s-1.2-.6-1.2-1.4c0-.8.5-1.4 1.2-1.4Z"/></svg></a><a href="https://www.douyin.com/user/self?from_tab_name=main" target="_blank" rel="noreferrer" aria-label="抖音"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 2h3c.3 2.2 1.6 3.7 4 4.2v3.1a8.7 8.7 0 0 1-4-1.2v6.9c0 4-2.9 7-6.8 7-3.6 0-6.2-2.4-6.2-5.8 0-3.6 2.8-6.1 6.8-6.1.4 0 .8 0 1.2.1v3.3a5 5 0 0 0-1.4-.2c-1.8 0-3 1.1-3 2.7 0 1.5 1.1 2.6 2.7 2.6 1.8 0 3-1.2 3-3.4V2h.7Z"/></svg></a></nav></footer>
+  <script src="script.js"></script>
+</body>
+</html>

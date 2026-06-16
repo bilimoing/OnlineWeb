@@ -1,0 +1,12 @@
+{
+  "name": "moling-pixel-site",
+  "version": "1.0.0",
+  "description": "末泠的个人网站：像素风 Mod 与工具平台，带 GitHub OAuth 后端。",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
