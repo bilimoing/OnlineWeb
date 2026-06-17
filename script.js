@@ -21,7 +21,7 @@ const state = {
 const githubConfig = {
   owner: 'bilimoing',
   repo: 'OnlineWeb',
-  branch: 'main'
+  branch: 'master'
 };
 
 async function api(path, options = {}) {
@@ -56,20 +56,30 @@ async function loadServerData() {
   try {
     const data = await api('/api/data');
     state.stats = data.stats || {};
-    state.uploads = Array.isArray(data.uploads) ? data.uploads : [];
+    state.uploads = normalizeUploads(Array.isArray(data.uploads) ? data.uploads : []);
   } catch {
     try {
       const [uploads, stats] = await Promise.all([
-        fetch('data/uploads.json').then((res) => res.ok ? res.json() : []),
+        fetch('mods.json').then((res) => res.ok ? res.json() : []),
         fetch('data/stats.json').then((res) => res.ok ? res.json() : {})
       ]);
-      state.uploads = Array.isArray(uploads) ? uploads : [];
+      state.uploads = normalizeUploads(Array.isArray(uploads) ? uploads : []);
       state.stats = stats || {};
     } catch {
       state.uploads = [];
       state.stats = {};
     }
   }
+}
+
+function normalizeUploads(items) {
+  return items.map((item) => ({
+    ...item,
+    type: item.type || (item.game === 'tool' ? 'tool' : 'mod'),
+    category: item.category || item.game || 'terraria',
+    time: item.time || new Date().toISOString(),
+    uploader: item.uploader || 'admin'
+  }));
 }
 
 async function loginWithToken(form) {
@@ -116,7 +126,7 @@ function uploadedItems(type) {
     .map((item) => ({
       id: item.id,
       type: item.type,
-      category: item.category || (item.type === 'mod' ? '泰拉瑞亚' : '工具'),
+      category: item.category || item.game || (item.type === 'mod' ? 'terraria' : 'tool'),
       name: item.name,
       version: item.version || '1.0.0',
       date: item.time || new Date().toISOString(),
@@ -304,7 +314,7 @@ async function githubRequest(path, options = {}) {
 }
 
 async function verifyGithubToken() {
-  await githubRequest('data/uploads.json').catch((error) => {
+  await githubRequest('mods.json').catch((error) => {
     if (error.message === 'GitHub 404') return null;
     throw error;
   });
@@ -348,23 +358,33 @@ async function uploadDirectToGithub(data) {
   }
   let uploads = [];
   try {
-    const oldData = await githubRequest('data/uploads.json');
+    const oldData = await githubRequest('mods.json');
     uploads = JSON.parse(decodeURIComponent(escape(atob(oldData.content.replace(/\s/g, '')))));
     if (!Array.isArray(uploads)) uploads = [];
   } catch (error) {
     if (error.message !== 'GitHub 404') throw error;
   }
   const record = {
-    ...data,
-    files: undefined,
-    uploadedFiles,
-    uploader: 'admin',
-    time: new Date().toISOString(),
-    id: `${data.type}-${Date.now()}`
+    id: Date.now().toString(),
+    name: data.name,
+    game: data.category || (data.type === 'mod' ? 'terraria' : 'tool'),
+    version: data.version,
+    icon: data.icon,
+    file: data.file,
+    source: data.source || null,
+    desc: data.desc,
+    tags: Array.isArray(data.tags) ? data.tags : [],
+    screenshots: Array.isArray(data.screenshots) ? data.screenshots : []
   };
   uploads.push(record);
-  await putGithubFile('data/uploads.json', JSON.stringify(uploads, null, 2), `upload: ${record.name}`);
-  state.uploads = uploads;
+  await putGithubFile('mods.json', JSON.stringify(uploads, null, 2), `Add: ${record.name}`);
+  state.uploads = uploads.map((item) => ({
+    ...item,
+    type: item.game === 'tool' ? 'tool' : 'mod',
+    category: item.game,
+    time: new Date().toISOString(),
+    uploader: 'admin'
+  }));
   return record;
 }
 

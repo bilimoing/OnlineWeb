@@ -14,7 +14,7 @@ const config = {
   baseUrl: process.env.BASE_URL || 'http://localhost:3000',
   githubOwner: process.env.GITHUB_OWNER || 'bilimoing',
   githubRepo: process.env.GITHUB_REPO || 'OnlineWeb',
-  githubBranch: process.env.GITHUB_BRANCH || 'main',
+  githubBranch: process.env.GITHUB_BRANCH || 'master',
   adminPassword: process.env.ADMIN_PASSWORD || '123456'
 };
 
@@ -41,7 +41,8 @@ function ensureData() {
   fs.mkdirSync(dataDir, { recursive: true });
   const defaults = {
     'stats.json': {},
-    'uploads.json': []
+    'uploads.json': [],
+    'mods.json': []
   };
   for (const [name, value] of Object.entries(defaults)) {
     const file = path.join(dataDir, name);
@@ -204,13 +205,24 @@ async function handleApi(req, res, url) {
     const user = requireAdmin(req, res);
     if (!user) return;
     const body = await readBody(req);
-    const uploads = readJson('uploads.json', []);
+    const uploads = readJson('mods.json', []);
     const basePrefix = body.type === 'mod' ? 'mods' : 'tools';
-    const uploadedFiles = await uploadGithubFiles(body.files, basePrefix, `upload ${body.type}`, user.token);
-    const record = { ...body, files: undefined, uploadedFiles, uploader: user.login, time: new Date().toISOString(), id: `${body.type}-${Date.now()}` };
+    await uploadGithubFiles(body.files, basePrefix, `upload ${body.type}`, user.token);
+    const record = {
+      id: Date.now().toString(),
+      name: body.name,
+      game: body.category || (body.type === 'mod' ? 'terraria' : 'tool'),
+      version: body.version,
+      icon: body.icon,
+      file: body.file,
+      source: body.source || null,
+      desc: body.desc,
+      tags: Array.isArray(body.tags) ? body.tags : [],
+      screenshots: Array.isArray(body.screenshots) ? body.screenshots : []
+    };
     uploads.push(record);
-    writeJson('uploads.json', uploads);
-    await putGithubFile('data/uploads.json', JSON.stringify(uploads, null, 2), `upload: ${record.name}`, user.token);
+    writeJson('mods.json', uploads);
+    await putGithubFile('mods.json', JSON.stringify(uploads, null, 2), `Add: ${record.name}`, user.token);
     return send(res, 200, { ok: true, record });
   }
 
