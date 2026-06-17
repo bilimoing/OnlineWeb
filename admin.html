@@ -32,7 +32,7 @@
       <h2>登录</h2>
       <form id="login-form" class="admin-form">
         <label class="field"><span>GitHub Token</span><input name="token" required placeholder="ghp_... / github_pat_..." /></label>
-        <label class="field"><span>管理员密码</span><input name="password" type="password" required placeholder="输入管理员密码" /></label>
+        <label class="field"><span>管理员密码</span><input name="password" type="password" required placeholder="默认 123456" /></label>
         <button class="pixel-button primary" type="submit">进入后台</button>
       </form>
       <p id="login-hint">登录后可上传 Mod / 工具，并同步到 GitHub 仓库。</p>
@@ -44,7 +44,7 @@
       <article class="panel" data-reveal><span class="pixel-label">上传记录</span><h2 id="sync-total">0</h2><p>已提交到 GitHub 数据文件的上传记录。</p></article>
     </section>
 
-    <section class="panel admin-panel" data-reveal>
+    <section id="upload-panel" class="panel admin-panel is-hidden" data-reveal>
       <h2>上传内容</h2>
       <div class="admin-tabs" role="tablist" aria-label="上传类型">
         <button class="tag-button active" type="button" data-upload-type="mod">上传 Mod</button>

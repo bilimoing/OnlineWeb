@@ -12,10 +12,10 @@ const sessions = new Map();
 const config = {
   port: Number(process.env.PORT || 3000),
   baseUrl: process.env.BASE_URL || 'http://localhost:3000',
-  githubOwner: process.env.GITHUB_OWNER || '',
-  githubRepo: process.env.GITHUB_REPO || '',
+  githubOwner: process.env.GITHUB_OWNER || 'bilimoing',
+  githubRepo: process.env.GITHUB_REPO || 'OnlineWeb',
   githubBranch: process.env.GITHUB_BRANCH || 'main',
-  adminPassword: process.env.ADMIN_PASSWORD || 'admin123'
+  adminPassword: process.env.ADMIN_PASSWORD || '123456'
 };
 
 const mime = {
@@ -161,10 +161,8 @@ async function uploadGithubFiles(files, prefix, message, token) {
 async function handleApi(req, res, url) {
   if (url.pathname === '/api/auth/login' && req.method === 'POST') {
     const body = await readBody(req);
-    if (body.password !== config.adminPassword) return send(res, 403, { error: '管理员密码错误' });
-    if (!String(body.token || '').startsWith('github_') && !String(body.token || '').startsWith('ghp_')) {
-      return send(res, 400, { error: 'GitHub Token 格式不正确' });
-    }
+    if (String(body.password || '') !== config.adminPassword) return send(res, 403, { error: '管理员密码错误' });
+    if (!String(body.token || '').trim()) return send(res, 400, { error: '请输入 GitHub Token' });
     const sid = crypto.randomBytes(24).toString('hex');
     sessions.set(sid, { login: 'admin', token: body.token, time: Date.now() });
     res.writeHead(200, {

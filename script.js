@@ -66,10 +66,18 @@ async function loadServerData() {
 
 async function loginWithToken(form) {
   const data = Object.fromEntries(new FormData(form));
-  await api('/api/auth/login', { method: 'POST', body: JSON.stringify(data) });
-  await loadMe();
-  refreshAuth();
-  renderPage();
+  try {
+    await api('/api/auth/login', { method: 'POST', body: JSON.stringify(data) });
+    await loadMe();
+    refreshAuth();
+    renderPage();
+    const hint = document.querySelector('#login-hint');
+    if (hint) hint.textContent = '登录成功，已开放上传同步。';
+  } catch (error) {
+    const hint = document.querySelector('#login-hint');
+    if (hint) hint.textContent = error.message || '登录失败，请检查密码和 Token。';
+    throw error;
+  }
 }
 
 async function logout() {
@@ -196,12 +204,16 @@ async function trackDownload(id) {
 
 function renderAdmin() {
   const total = Object.values(state.stats).reduce((sum, count) => sum + count, 0);
-  document.querySelector('#auth-state').textContent = state.user ? '已登录' : '未登录';
-  document.querySelector('#auth-desc').textContent = state.user ? 'Token 已保存到服务端会话，可上传同步。' : '输入管理员密码和 GitHub Token。';
+  const loggedIn = Boolean(state.user);
+  document.querySelector('#auth-state').textContent = loggedIn ? '已登录' : '未登录';
+  document.querySelector('#auth-desc').textContent = loggedIn ? 'Token 已保存到服务端会话，可上传并同步到 GitHub。' : '请输入管理员密码与 GitHub Token 后登录。';
   document.querySelector('#download-total').textContent = String(total);
   document.querySelector('#sync-total').textContent = String(state.uploads.length);
   document.querySelector('#sync-list').innerHTML = state.uploads.map((item) => `<article><strong>${item.type === 'mod' ? 'Mod' : '工具'}：${item.name}</strong><span>${new Date(item.time).toLocaleString('zh-CN')} · @${item.uploader}</span><p>v${item.version}</p><small>${item.checksum || '无校验'}</small></article>`).join('') || '<p>暂无上传记录。</p>';
-  document.querySelector('.login-panel')?.classList.toggle('is-hidden', Boolean(state.user));
+  document.querySelector('.login-panel')?.classList.toggle('is-hidden', loggedIn);
+  document.querySelector('#upload-panel')?.classList.toggle('is-hidden', !loggedIn);
+  const hint = document.querySelector('#login-hint');
+  if (hint) hint.textContent = loggedIn ? '已登录，可以上传并同步到 GitHub 仓库。' : '默认管理员密码为 123456，输入 GitHub Token 后登录。';
   syncUploadTabs();
   renderPresetTags();
 }
@@ -257,7 +269,11 @@ async function collectUploadFiles(form) {
 }
 
 async function submitUpload(form) {
-  if (!state.user) return alert('请先登录后台');
+  if (!state.user) {
+    const hint = document.querySelector('#login-hint');
+    if (hint) hint.textContent = '请先登录后再上传。';
+    return alert('请先登录后台');
+  }
   const formData = new FormData(form);
   const raw = Object.fromEntries(formData);
   delete raw.iconFile;
@@ -293,10 +309,19 @@ async function submitUpload(form) {
 function syncUploadTabs() {
   const typeInput = document.querySelector('#upload-form [name="type"]');
   const tabs = document.querySelectorAll('[data-upload-type]');
-  if (!typeInput || !tabs.length) return;
+  const uploadForm = document.querySelector('#upload-form');
+  if (!typeInput || !tabs.length || !uploadForm) return;
+  const locked = !state.user;
+  uploadForm.querySelectorAll('input, textarea, button, select').forEach((field) => {
+    if (field.id === 'add-tag-btn' || field.closest('#preset-tags') || field.closest('#selected-tags')) return;
+    if (field.tagName === 'BUTTON' && field.dataset.uploadType) return;
+    field.disabled = locked;
+  });
   tabs.forEach((tab) => {
     tab.classList.toggle('active', tab.dataset.uploadType === typeInput.value);
+    tab.disabled = locked;
     tab.onclick = () => {
+      if (locked) return;
       typeInput.value = tab.dataset.uploadType;
       const category = document.querySelector('#upload-form [name="category"]');
       if (category) category.value = tab.dataset.uploadType === 'mod' ? '泰拉瑞亚' : '工具';
