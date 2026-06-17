@@ -258,6 +258,14 @@ function bindEvents() {
   });
   document.querySelector('#search-input')?.addEventListener('input', () => { state.currentPage = 1; renderPage(); });
   document.querySelector('#sort-select')?.addEventListener('change', () => { state.currentPage = 1; renderPage(); });
+
+  const uploadForm = document.querySelector('#upload-form');
+  if (uploadForm) {
+    const syncPaths = () => syncUploadPaths(uploadForm);
+    uploadForm.querySelector('[name="iconFile"]')?.addEventListener('change', syncPaths);
+    uploadForm.querySelector('[name="mainFile"]')?.addEventListener('change', syncPaths);
+    uploadForm.querySelector('[name="sourceFile"]')?.addEventListener('change', syncPaths);
+  }
 }
 
 async function githubRequest(path, options = {}) {
@@ -429,6 +437,7 @@ function syncUploadTabs() {
       if (category) category.value = tab.dataset.uploadType === 'mod' ? '泰拉瑞亚' : '工具';
       document.querySelectorAll('.mod-only').forEach((element) => element.classList.toggle('is-hidden', tab.dataset.uploadType !== 'mod'));
       tabs.forEach((item) => item.classList.toggle('active', item === tab));
+      syncUploadPaths(uploadForm);
     };
   });
 }
@@ -453,6 +462,20 @@ function addManualTag() {
   if (!state.selectedTags.includes(tag)) state.selectedTags.push(tag);
   input.value = '';
   renderPresetTags();
+}
+
+function syncUploadPaths(form) {
+  if (!form) return;
+  const prefix = form.querySelector('[name="type"]')?.value === 'tool' ? 'tools' : 'mods';
+  const iconFile = form.querySelector('[name="iconFile"]')?.files?.[0];
+  const mainFile = form.querySelector('[name="mainFile"]')?.files?.[0];
+  const sourceFile = form.querySelector('[name="sourceFile"]')?.files?.[0];
+  const iconInput = form.querySelector('[name="icon"]');
+  const fileInput = form.querySelector('[name="file"]');
+  const sourceInput = form.querySelector('[name="source"]');
+  if (iconFile && iconInput) iconInput.value = `${prefix}/${iconFile.name}`;
+  if (mainFile && fileInput) fileInput.value = `${prefix}/${mainFile.name}`;
+  if (sourceFile && sourceInput) sourceInput.value = `${prefix}/${sourceFile.name}`;
 }
 
 function drawWorld() {
