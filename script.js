@@ -301,14 +301,19 @@ function bindEvents() {
 async function githubRequest(path, options = {}) {
   if (!state.githubToken) throw new Error('请先登录并输入 GitHub Token');
   const url = `https://api.github.com/repos/${githubConfig.owner}/${githubConfig.repo}/contents/${encodeURIComponent(path).replace(/%2F/g, '/')}?ref=${githubConfig.branch}`;
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${state.githubToken}`,
-      ...(options.headers || {})
-    }
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${state.githubToken}`,
+        ...(options.headers || {})
+      }
+    });
+  } catch {
+    throw new Error('无法连接 GitHub API，请检查网络或使用 Node 后端代理上传');
+  }
   if (!response.ok) throw new Error(`GitHub ${response.status}`);
   return response.json();
 }
@@ -328,19 +333,24 @@ async function putGithubFile(path, content, message, alreadyBase64 = false) {
     if (error.message !== 'GitHub 404') throw error;
   }
   const url = `https://api.github.com/repos/${githubConfig.owner}/${githubConfig.repo}/contents/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
-  const response = await fetch(url, {
-    method: 'PUT',
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${state.githubToken}`
-    },
-    body: JSON.stringify({
-      message,
-      branch: githubConfig.branch,
-      content: alreadyBase64 ? content : btoa(unescape(encodeURIComponent(content))),
-      sha
-    })
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${state.githubToken}`
+      },
+      body: JSON.stringify({
+        message,
+        branch: githubConfig.branch,
+        content: alreadyBase64 ? content : btoa(unescape(encodeURIComponent(content))),
+        sha
+      })
+    });
+  } catch {
+    throw new Error('无法连接 GitHub API，请检查网络或使用 Node 后端代理上传');
+  }
   if (!response.ok) throw new Error(`GitHub PUT ${response.status}`);
   return response.json();
 }
