@@ -14,7 +14,8 @@ const state = {
   selectedTags: [],
   pointer: null,
   lastPointer: null,
-  githubToken: sessionStorage.getItem('moling_github_token') || ''
+  githubToken: sessionStorage.getItem('moling_github_token') || '',
+  uploading: false
 };
 
 const githubConfig = {
@@ -252,9 +253,28 @@ function bindEvents() {
   });
   document.addEventListener('submit', async (event) => {
     const loginForm = event.target.closest('#login-form');
-    if (loginForm) { event.preventDefault(); await loginWithToken(loginForm); }
+    if (loginForm) {
+      event.preventDefault();
+      try { await loginWithToken(loginForm); } catch (error) { alert(error.message || '登录失败'); }
+    }
     const uploadForm = event.target.closest('#upload-form');
-    if (uploadForm) { event.preventDefault(); await submitUpload(uploadForm); }
+    if (uploadForm) {
+      event.preventDefault();
+      try { await submitUpload(uploadForm); } catch (error) { alert(error.message || '上传失败'); }
+    }
+  });
+  document.addEventListener('click', async (event) => {
+    const uploadButton = event.target.closest('#upload-submit');
+    if (!uploadButton) return;
+    const uploadForm = uploadButton.closest('#upload-form');
+    if (!uploadForm) return;
+    event.preventDefault();
+    if (!uploadForm.reportValidity()) {
+      const hint = document.querySelector('#login-hint');
+      if (hint) hint.textContent = '请先补全上传表单里的必填项。';
+      return;
+    }
+    try { await submitUpload(uploadForm); } catch (error) { alert(error.message || '上传失败'); }
   });
   document.querySelector('#search-input')?.addEventListener('input', () => { state.currentPage = 1; renderPage(); });
   document.querySelector('#sort-select')?.addEventListener('change', () => { state.currentPage = 1; renderPage(); });
@@ -379,11 +399,24 @@ async function collectUploadFiles(form) {
 }
 
 async function submitUpload(form) {
+  if (state.uploading) return;
+  state.uploading = true;
   if (!state.user) {
+    state.uploading = false;
     const hint = document.querySelector('#login-hint');
     if (hint) hint.textContent = '请先登录后再上传。';
     return alert('请先登录后台');
   }
+  syncUploadPaths(form);
+  const submitButton = form.querySelector('button[type="submit"]');
+  const oldText = submitButton?.textContent || '';
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = '正在上传并同步...';
+  }
+  const hint = document.querySelector('#login-hint');
+  if (hint) hint.textContent = '正在上传文件并同步 GitHub，请稍等...';
+  try {
   const formData = new FormData(form);
   const raw = Object.fromEntries(formData);
   delete raw.iconFile;
@@ -413,7 +446,18 @@ async function submitUpload(form) {
   form.querySelector('[name="category"]').value = '泰拉瑞亚';
   await loadServerData();
   renderAdmin();
+  if (hint) hint.textContent = '上传成功，已同步到 GitHub 仓库。';
   alert('已上传并同步到 GitHub 仓库');
+  } catch (error) {
+    if (hint) hint.textContent = `上传失败：${error.message || '未知错误'}`;
+    throw error;
+  } finally {
+    state.uploading = false;
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = oldText || '上传并同步 GitHub';
+    }
+  }
 }
 
 function syncUploadTabs() {
