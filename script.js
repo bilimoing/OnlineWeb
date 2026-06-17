@@ -13,7 +13,14 @@ const state = {
   currentPage: 1,
   selectedTags: [],
   pointer: null,
-  lastPointer: null
+  lastPointer: null,
+  githubToken: sessionStorage.getItem('moling_github_token') || ''
+};
+
+const githubConfig = {
+  owner: 'bilimoing',
+  repo: 'OnlineWeb',
+  branch: 'main'
 };
 
 async function api(path, options = {}) {
@@ -68,20 +75,26 @@ async function loginWithToken(form) {
   const data = Object.fromEntries(new FormData(form));
   try {
     await api('/api/auth/login', { method: 'POST', body: JSON.stringify(data) });
-    await loadMe();
-    refreshAuth();
-    renderPage();
-    const hint = document.querySelector('#login-hint');
-    if (hint) hint.textContent = '登录成功，已开放上传同步。';
   } catch (error) {
-    const hint = document.querySelector('#login-hint');
-    if (hint) hint.textContent = error.message || '登录失败，请检查密码和 Token。';
-    throw error;
+    if (!/HTTP 404|HTTP 405/i.test(error.message)) throw error;
   }
+  if (String(data.password || '') !== '123456') throw new Error('管理员密码错误');
+  if (!String(data.token || '').trim()) throw new Error('请输入 GitHub Token');
+  state.githubToken = String(data.token).trim();
+  sessionStorage.setItem('moling_github_token', state.githubToken);
+  await verifyGithubToken();
+  const fallbackUser = { login: 'admin' };
+  await loadMe();
+  state.user = state.user || fallbackUser;
+  refreshAuth();
+  renderPage();
+  const hint = document.querySelector('#login-hint');
+  if (hint) hint.textContent = '登录成功，已开放上传同步。';
 }
 
 async function logout() {
-  await fetch('/api/auth/logout', { credentials: 'include' });
+  sessionStorage.removeItem('moling_github_token');
+  await fetch('/api/auth/logout', { credentials: 'include' }).catch(() => null);
   location.reload();
 }
 
@@ -247,6 +260,95 @@ function bindEvents() {
   document.querySelector('#sort-select')?.addEventListener('change', () => { state.currentPage = 1; renderPage(); });
 }
 
+async function githubRequest(path, options = {}) {
+  if (!state.githubToken) throw new Error('请先登录并输入 GitHub Token');
+  const url = `https://api.github.com/repos/${githubConfig.owner}/${githubConfig.repo}/contents/${encodeURIComponent(path).replace(/%2F/g, '/')}?ref=${githubConfig.branch}`;
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${state.githubToken}`,
+      ...(options.headers || {})
+    }
+  });
+  if (!response.ok) throw new Error(`GitHub ${response.status}`);
+  return response.json();
+}
+
+async function verifyGithubToken() {
+  await githubRequest('data/uploads.json').catch((error) => {
+    if (error.message === 'GitHub 404') return null;
+    throw error;
+  });
+}
+
+async function putGithubFile(path, content, message, alreadyBase64 = false) {
+  let sha;
+  try {
+    sha = (await githubRequest(path)).sha;
+  } catch (error) {
+    if (error.message !== 'GitHub 404') throw error;
+  }
+  const url = `https://api.github.com/repos/${githubConfig.owner}/${githubConfig.repo}/contents/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${state.githubToken}`
+    },
+    body: JSON.stringify({
+      message,
+      branch: githubConfig.branch,
+      content: alreadyBase64 ? content : btoa(unescape(encodeURIComponent(content))),
+      sha
+    })
+  });
+  if (!response.ok) throw new Error(`GitHub PUT ${response.status}`);
+  return response.json();
+}
+
+async function uploadDirectToGithub(data) {
+  const files = Array.isArray(data.files) ? data.files : [];
+  const uploadedFiles = [];
+  for (const file of files) {
+    if (!file.name || !file.content) continue;
+    const prefix = data.type === 'mod' ? 'mods' : 'tools';
+    const safeName = file.name.replace(/[\\/:*?"<>|]/g, '_');
+    const filePath = `${prefix}/${safeName}`;
+    await putGithubFile(filePath, file.content, `upload ${data.type}: ${safeName}`, true);
+    uploadedFiles.push(filePath);
+  }
+  let uploads = [];
+  try {
+    const oldData = await githubRequest('data/uploads.json');
+    uploads = JSON.parse(decodeURIComponent(escape(atob(oldData.content.replace(/\s/g, '')))));
+    if (!Array.isArray(uploads)) uploads = [];
+  } catch (error) {
+    if (error.message !== 'GitHub 404') throw error;
+  }
+  const record = {
+    ...data,
+    files: undefined,
+    uploadedFiles,
+    uploader: 'admin',
+    time: new Date().toISOString(),
+    id: `${data.type}-${Date.now()}`
+  };
+  uploads.push(record);
+  await putGithubFile('data/uploads.json', JSON.stringify(uploads, null, 2), `upload: ${record.name}`);
+  state.uploads = uploads;
+  return record;
+}
+
+async function uploadWithFallback(data) {
+  try {
+    await api('/api/admin/upload', { method: 'POST', body: JSON.stringify(data) });
+  } catch (error) {
+    if (!/HTTP 404|HTTP 405/i.test(error.message)) throw error;
+    await uploadDirectToGithub(data);
+  }
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -296,7 +398,7 @@ async function submitUpload(form) {
     changelog: String(raw.changelog || '').split('\n').map((item) => item.trim()).filter(Boolean),
     files
   };
-  await api('/api/admin/upload', { method: 'POST', body: JSON.stringify(data) });
+  await uploadWithFallback(data);
   form.reset();
   state.selectedTags = [];
   form.querySelector('[name="type"]').value = 'mod';
