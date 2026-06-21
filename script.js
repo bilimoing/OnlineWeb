@@ -84,18 +84,15 @@ function normalizeUploads(items) {
 
 async function loginWithToken(form) {
   const data = Object.fromEntries(new FormData(form));
-  let serverLoginOk = false;
   try {
     await api('/api/auth/login', { method: 'POST', body: JSON.stringify(data) });
-    serverLoginOk = true;
   } catch (error) {
-    if (!/HTTP 404|HTTP 405/i.test(error.message)) throw error;
+    if (!/HTTP 404|HTTP 405|Failed to fetch|NetworkError/i.test(error.message)) throw error;
   }
   if (String(data.password || '') !== '123456') throw new Error('管理员密码错误');
   if (!String(data.token || '').trim()) throw new Error('请输入 GitHub Token');
   state.githubToken = String(data.token).trim();
   sessionStorage.setItem('moling_github_token', state.githubToken);
-  if (!serverLoginOk) await verifyGithubToken();
   const fallbackUser = { login: 'admin' };
   await loadMe();
   state.user = state.user || fallbackUser;
