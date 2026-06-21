@@ -112,16 +112,27 @@ function readBody(req) {
 }
 
 async function githubFetch(url, token, options = {}) {
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      Accept: 'application/vnd.github+json',
-      'User-Agent': 'moling-pixel-site',
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {})
-    }
-  });
-  if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+  let res;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'moling-pixel-site',
+        Authorization: `Bearer ${token}`,
+        ...(options.headers || {})
+      }
+    });
+  } catch (error) {
+    throw new Error(`无法连接 GitHub API：${error.message || '网络请求失败'}`);
+  }
+
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    const message = detail.message ? `：${detail.message}` : '';
+    throw new Error(`GitHub API ${res.status}${message}`);
+  }
+
   return res.json();
 }
 
